@@ -27,6 +27,8 @@ BBox_CSV = "BBox_List_2017.csv"
 IMAGE_OUT = os.path.join("../data", "image_out")
 FEATURES_OUT = os.path.join("../data", "features")
 
+TRANSFORM_SHAPE = (256,256)
+
 # Data Set object for training
 class Xray(Dataset):
     def __init__(self, labels_path, image_path, transform_shape, tansform=None, testing=True):
@@ -56,7 +58,7 @@ class Xray(Dataset):
         return data[["Image Index", "y"]]
 
     def loadImages(self):
-        lim = -1#10#00
+        lim = 64#10#00
         images = []
         indices = []
         i = 0
@@ -65,7 +67,12 @@ class Xray(Dataset):
             try:
                 im = io.imread(f_path)
                 im = transform.resize(im, self.transform_shape)
-                im = np.stack([im]*3, axis=-1)
+                if im.shape[-1] == 3:
+                    pass #it's already the correct shape
+                elif im.shape[-1] == 4:
+                    im = im[:,:,0:3]
+                else:
+                    im = np.stack([im]*3, axis=-1)
                 print(im.shape)
                 #im = im.reshape((TRANSFORM_SHAPE[0], TRANSFORM_SHAPE[1], 1)) # from shape (256,256,1)
                 images += [im]
@@ -141,15 +148,33 @@ def train(model, train_loader, criterion, optimizer, num_epochs=4):
         print(f"epoch {epoch} running_loss {running_loss}")
     return model
 
+def validate(model, valid_loader):
+    model.eval()
+    target = torch.FloatTensor()
+    pred = torch.FloatTensor()
+    for i, (X,y) in enumerate(valid_loader):
+        X = X.view(-1,3,TRANSFORM_SHAPE[0], TRANSFORM_SHAPE[1])
+        prediction = model(X)
+        target = torch.cat((target, y), 0)
+        pred = torch.cat((pred, prediction), 0)
+    return target, pred
+
 def main():
     ds = Xray(LABEL_CSV, IMAGE_DIRECTORY, TRANSFORM_SHAPE)
     model = DenseNet121(14)
     criterion = nn.BCELoss()
     #criterion = nn.CrossEntropyLoss() # doesn't work multilabel output
     optimizer = optim.Adam(model.parameters())
-    dl = DataLoader(dataset=ds, batch_size=32, shuffle=False)
+    dl = DataLoader(dataset=ds, batch_size=64, shuffle=False)
     
-    model.train() # set training mode
+    model = train(model, dl, criterion, optimizer)
+    target, pred = validate(model, dl)
+
+    pickle.dump(model, "model.pkl")
+    pickle.dump(target, "target.pkl")
+    pickle.dump(pred, "pred.pkl")
+
+
     
 
 
