@@ -41,6 +41,7 @@ class Xray(Dataset):
         self.image_path = image_path
         self.batchSize = batchSize
         self.train = train
+        self.rotate = train
 
         self.trainingIdxs = []
         with open(train_path, 'r') as f:
@@ -101,12 +102,12 @@ class Xray(Dataset):
         y = torch.FloatTensor(data.iloc[idx]['y'])
         fn = data.iloc[idx]
         im = io.imread(os.path.join(self.image_path, fn.name))
-        X = torchvision.transforms.functional.to_tensor(im).float()
+        # if self.rotate:
+        #     rot = np.random.choice([0,90,180,360])
+        #     im = skimage.transform.rotate(im,rot)
+        X = torchvision.transforms.functional.to_tensor(im).float()        
         #X = self.imBatch[idx % self.batchSize]
         return X, y
-
-
-
 
 
 ## Copied
@@ -199,10 +200,8 @@ def main():
     dl_test = DataLoader(dataset=ds_v , batch_size=28, shuffle=False,  pin_memory=True)    
 
     print("training")    
-    model = train(model, dl_train, criterion, optimizer, dl_test)
+    model = train(model, dl_train, criterion, optimizer, dl_test, 30)
     
-
-
 
 
 if __name__== "__main__":
